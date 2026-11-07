@@ -19,7 +19,7 @@ services:
       - "${DNS_BIND:-127.0.0.1}:53:53/tcp"
       - "${DNS_BIND:-127.0.0.1}:53:53/udp"
     environment:
-      TZ: 'Europe/Lisbon'
+      TZ: '${TZ:-Etc/UTC}'
       FTLCONF_webserver_api_password: "${PIHOLE_PASSWORD}"
       FTLCONF_dns_listeningMode: 'ALL'
       FTLCONF_dns_upstreams: '172.31.53.2'

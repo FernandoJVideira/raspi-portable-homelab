@@ -4,6 +4,6 @@ After=docker.service
 
 [Service]
 Type=oneshot
-User=fvideira
-ExecStart=/home/fvideira/deploy/pihole/mode.sh sync
+User=@USER@
+ExecStart=@DEPLOY_DIR@/pihole/mode.sh sync
 TimeoutStartSec=300

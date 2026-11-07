@@ -8,7 +8,7 @@ services:
       - NET_RAW
     network_mode: host
     environment:
-      - TZ=Europe/Lisbon
+      - TZ=${TZ:-Etc/UTC}
     volumes:
       - /mnt/ssd/AppData/home-assistant:/config
       - /run/dbus:/run/dbus:ro

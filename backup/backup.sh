@@ -5,7 +5,8 @@ set -Eeuo pipefail
 
 DEST="/mnt/ssd/backups"
 KEEP=14                                   # number of dated backups to keep
-USER_HOME="/home/fvideira"
+DEPLOY_DIR="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+DEPLOY_USER="$(stat -c %U "$DEPLOY_DIR")"
 CONTAINERS=(caddy arcane pihole unbound cloudflared ssh-fwd homeassistant)
 APPDATA="/mnt/ssd/AppData"
 EXTRA_PATHS=()                            # extra absolute paths, e.g. a bind-mounted data dir
@@ -48,9 +49,9 @@ safe_tar() {
 }
 
 # 1. Compose files, Caddyfile, scripts, .env files
-safe_tar -czf "$OUT/deploy.tgz" -C "$USER_HOME" \
+safe_tar -czf "$OUT/deploy.tgz" -C "$(dirname "$DEPLOY_DIR")" \
   --exclude='*.log' --exclude='.*.lock' --exclude='pihole-FTL.db*' \
-  deploy
+  "$(basename "$DEPLOY_DIR")"
 
 # 2. App data bind-mounted by the containers (Home Assistant, Pi-hole, Caddy certificates, Arcane)
 if [ -d "$APPDATA" ]; then
@@ -92,7 +93,7 @@ done
 safe_tar -czf "$OUT/system.tgz" -C / "${sys[@]}"
 
 # 6. Crontabs and a Docker inventory
-crontab -l -u fvideira > "$OUT/crontab-fvideira.txt" 2>/dev/null || true
+crontab -l -u "$DEPLOY_USER" > "$OUT/crontab-$DEPLOY_USER.txt" 2>/dev/null || true
 crontab -l > "$OUT/crontab-root.txt" 2>/dev/null || true
 {
   docker ps -a --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}'

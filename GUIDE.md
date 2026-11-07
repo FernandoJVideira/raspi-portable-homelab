@@ -3,7 +3,7 @@
 This guide is the ordered procedure to deploy the whole setup on a fresh Raspberry Pi 4B that
 boots from a USB SSD. The [README](README.md) is the reference; this guide links to it instead
 of repeating long explanations. Replace every `<placeholder>` with your own value, and take
-secrets from Proton Pass. Never paste secrets into git.
+secrets from your password manager. Never paste secrets into git.
 
 If you are rebuilding from a backup instead of starting fresh, follow phases 1 to 4, then do
 phase 5 (restore), then continue from phase 6.
@@ -24,16 +24,16 @@ phase 5 (restore), then continue from phase 6.
 
 3. On your computer, open Raspberry Pi Imager and flash **Raspberry Pi OS Lite (64-bit)**
    (Debian 13 trixie) directly onto the SSD. In the OS customisation settings use:
-   - Hostname `atlas`.
-   - Username `fvideira`.
+   - A hostname, written `<hostname>` in this guide (this repo uses `atlas` as the example).
+   - A username of your choice, written `<user>` in this guide.
    - SSH enabled, public-key authentication only (paste your public key).
-   - Timezone `Europe/Lisbon`.
+   - Timezone `<your timezone>` (for example `Europe/London`).
    - Wi-Fi is optional. Ethernet is the primary link. With no Ethernet link the Pi falls back
      to Wi-Fi and gets a different IP.
 4. Plug the SSD into the Pi and power it on. Log in over SSH:
 
    ```bash
-   ssh fvideira@atlas.local
+   ssh <user>@<hostname>.local
    ```
 
 5. Update the system:
@@ -59,16 +59,17 @@ root filesystem (no separate partition and no fstab entry).
    ```bash
    sudo mkdir -p /mnt/ssd/AppData/{pihole,home-assistant,arcane,caddy/caddy_data,caddy/caddy_config}
    sudo mkdir -p /mnt/ssd/backups
-   sudo chown -R fvideira:fvideira /mnt/ssd/AppData
+   sudo chown -R $USER:$USER /mnt/ssd/AppData
    ```
 
    `/mnt/ssd/backups` stays owned by root; `backup.sh` sets mode 700 on it.
 
-2. Clone the repository:
+2. Fork the repository on GitHub (or clone it directly) and use your fork's URL. Replace `<you>`
+   with your GitHub username:
 
    ```bash
    sudo apt install -y git
-   git clone https://github.com/FernandoJVideira/raspi-portable-homelab.git ~/deploy
+   git clone https://github.com/<you>/raspi-portable-homelab.git ~/deploy
    ```
 
 ## Phase 4. Docker
@@ -94,7 +95,7 @@ root filesystem (no separate partition and no fstab entry).
 2. Let your user run Docker, then log out and back in so the group applies:
 
    ```bash
-   sudo usermod -aG docker fvideira
+   sudo usermod -aG docker $USER
    ```
 
 3. Create the external network that the stacks share. The pihole stack creates its own `dns`
@@ -110,7 +111,7 @@ Skip this phase on a brand new install. Do it after phase 4 and **before** start
 
 1. Install restic and put the config in place, exactly as in the README one-time setup
    ([backups section](README.md#backupbackupsh-and-backupoffsitesh-nightly-backups)). You need
-   the R2 token, the repository URL and the restic password from Proton Pass:
+   the R2 token, the repository URL and the restic password from your password manager:
 
    ```bash
    sudo apt install -y restic
@@ -127,7 +128,7 @@ Skip this phase on a brand new install. Do it after phase 4 and **before** start
    sudo -i
    set -a; . /root/.config/restic/env; set +a
    restic snapshots
-   restic restore latest --target / --include /mnt/ssd/AppData --include /home/fvideira/deploy
+   restic restore latest --target / --include /mnt/ssd/AppData --include /home/<user>/deploy
    exit
    ```
 
@@ -141,7 +142,7 @@ Skip this phase on a brand new install. Do it after phase 4 and **before** start
 3. Check ownership with `ls -la /mnt/ssd/AppData/*`. Restic restores the original owners.
    Pi-hole and Home Assistant write some files as root inside their folders, so a blanket
    `chown` is not needed and would be wrong. Only fix a directory that was originally owned by
-   `fvideira` and now is not.
+   your user and now is not.
 
 Then continue with phase 6.
 
@@ -161,22 +162,33 @@ Then continue with phase 6.
 2. Warning: open a **second** SSH session and confirm you can log in before closing the
    current one. If the new session fails, fix the file from the first one.
 
-## Phase 7. Secrets
+## Phase 7. Fill in the .env files
 
-Skip the copying if you restored from a backup. Otherwise, in each stack copy the example,
-lock it down and fill it from Proton Pass:
+Nothing personal is hardcoded in the repository: every stack reads its values from its own
+`.env`, and the scripts derive the repo path and user from where they are checked out. The
+variables are listed in the README ([Configuration (.env)](README.md#configuration-env)).
+Throughout this guide `example.com` is a placeholder for your domain, and hostnames follow the
+pattern `arcane.atlas.example.com`.
+
+Skip this phase if you restored a backup of your own install in phase 5, since the `.env` files
+came back with it. Otherwise copy each example, lock it down and fill it in. Take secrets from
+your password manager:
 
 ```bash
 cd ~/deploy
-for s in arcane caddy cloudflared pihole; do
+for s in arcane caddy cloudflared pihole home-assistant; do
   cp "$s/.env.example" "$s/.env"
   chmod 600 "$s/.env"
 done
-nano arcane/.env        # ENCRYPTION_KEY, JWT_SECRET
-nano caddy/.env         # CF_API_TOKEN
-nano cloudflared/.env   # TUNNEL_TOKEN
-nano pihole/.env        # PIHOLE_PASSWORD; leave DNS_BIND empty, mode.sh manages it
+nano arcane/.env          # ENCRYPTION_KEY, JWT_SECRET, APP_URL (https://arcane.atlas.example.com)
+nano caddy/.env           # CF_API_TOKEN, DOMAIN (atlas.example.com)
+nano cloudflared/.env     # TUNNEL_TOKEN, DOMAIN (same value as in caddy/.env)
+nano pihole/.env          # PIHOLE_PASSWORD, TZ; leave DNS_BIND empty, mode.sh manages it
+nano home-assistant/.env  # TZ (for example Europe/London)
 ```
+
+`DOMAIN` is the zone your private hostnames live under: the services answer at
+`arcane.<DOMAIN>`, `pihole.<DOMAIN>`, `home.<DOMAIN>` and `ssh.<DOMAIN>`.
 
 The Cloudflare side (tunnel, token scopes) is described in the README
 ([Cloudflare](README.md#cloudflare)). Create the tunnel and copy its token before this step.
@@ -196,20 +208,17 @@ cd ~/deploy/home-assistant && docker compose up -d
 
 ## Phase 9. systemd units for Pi-hole
 
-Install `pihole-mode.service`, `pihole-sync.service` and `pihole-sync.timer` from
-`~/deploy/pihole/systemd`, exactly as the README shows
-([systemd](README.md#systemd)). In short: copy the units to `/etc/systemd/system/`, run
-`sudo systemctl daemon-reload`, enable `pihole-mode.service` and enable
-`pihole-sync.timer --now`. Use the timer or the NetworkManager hook, not both.
-
-Then run the mode service once by hand:
+Run the installer as your normal user with sudo. It renders `pihole-mode.service` and
+`pihole-sync.service` with your user name and the repo path, copies `pihole-sync.timer`,
+enables both, and starts the mode service ([systemd](README.md#systemd)):
 
 ```bash
-sudo systemctl start pihole-mode.service
+sudo ~/deploy/pihole/systemd/install.sh
 ```
 
-Enabling a unit does not run it now. Until it runs, Pi-hole listens only on 127.0.0.1
-(`DNS_BIND` is empty), so LAN clients get no DNS.
+Use the timer or the NetworkManager hook, not both. Enabling a unit does not run it, so the
+installer restarts `pihole-mode.service` itself: until it has run, Pi-hole listens only on
+127.0.0.1 (`DNS_BIND` is empty) and LAN clients get no DNS.
 
 ## Phase 10. Firewall
 
@@ -269,12 +278,12 @@ Docker-published ports bypass ufw, so publish nothing you do not want on the LAN
    ```
 
 3. Install the user cron jobs with `crontab -e`, exactly as in the README
-   ([Cron (user `fvideira`)](README.md#cron-user-fvideira)):
+   ([Cron (user)](README.md#cron-user)):
 
    ```
    PATH=/usr/local/bin:/usr/bin:/bin
-   0 4 1 * * /home/fvideira/deploy/caddy/update.sh
-   30 4 1 * * /home/fvideira/deploy/pihole/unbound-update.sh
+   0 4 1 * * /home/<user>/deploy/caddy/update.sh
+   30 4 1 * * /home/<user>/deploy/pihole/unbound-update.sh
    ```
 
 4. Install the root cron jobs with `sudo crontab -e`, as in the README
@@ -282,7 +291,7 @@ Docker-published ports bypass ufw, so publish nothing you do not want on the LAN
 
    ```
    PATH=/usr/local/bin:/usr/bin:/bin
-   0 3 * * * /home/fvideira/deploy/backup/backup.sh
+   0 3 * * * /home/<user>/deploy/backup/backup.sh
    ```
 
 ## Phase 13. Off-site backups
@@ -293,11 +302,11 @@ On a restored install restic is already set up (phase 5); skip to step 4. Otherw
 2. Create a bucket-scoped API token with **Object Read & Write** on that bucket only, and note
    the account ID, access key and secret.
 3. Create a check on healthchecks.io and copy its ping URL (optional, but it alerts you when a
-   night fails). Store the restic password in Proton Pass before you use it.
+   night fails). Store the restic password in your password manager before you use it.
 4. Follow the one-time setup in the README
    ([backups section](README.md#backupbackupsh-and-backupoffsitesh-nightly-backups)): install
    restic, create the env file and the password file, run `restic init`.
-5. Add the root cron line `15 3 * * * /home/fvideira/deploy/backup/offsite.sh` with
+5. Add the root cron line `15 3 * * * /home/<user>/deploy/backup/offsite.sh` with
    `sudo crontab -e`.
 
 ## Phase 14. Verify
@@ -322,8 +331,8 @@ Work through this checklist. Replace `<pi-ip>` with the Pi's address.
 9. First backups. Run both by hand as root and read the logs:
 
    ```bash
-   sudo /home/fvideira/deploy/backup/backup.sh
-   sudo /home/fvideira/deploy/backup/offsite.sh
+   sudo /home/<user>/deploy/backup/backup.sh
+   sudo /home/<user>/deploy/backup/offsite.sh
    sudo tail -n 20 /mnt/ssd/backups/backup.log /mnt/ssd/backups/offsite.log
    ```
 

@@ -5,7 +5,7 @@ Remote access goes through a Cloudflare Tunnel and the WARP client (Zero Trust).
 Nothing is published to the internet except what you explicitly add as a public hostname.
 
 > Secrets are never stored in this file. Tokens and passwords live in each stack's
-> `.env` (chmod 600, not in git) and in Proton Pass.
+> `.env` (chmod 600, not in git) and in your password manager.
 
 To build a new Atlas from scratch, follow [GUIDE.md](GUIDE.md).
 
@@ -22,12 +22,13 @@ To build a new Atlas from scratch, follow [GUIDE.md](GUIDE.md).
 
 ## Access model
 
-- **SSH:** key-only, key stored in Proton Pass (Proton Pass SSH agent). Password auth is
+- **SSH:** key-only, key kept in your password manager (or an SSH agent). Password auth is
   disabled via `/etc/ssh/sshd_config.d/01-hardening.conf` (it must sort before
   `50-cloud-init.conf`, which sets `PasswordAuthentication yes`).
-- **Web UIs:** `https://<name>.atlas.fernandovideira.com` over WARP. These are *private
-  hostname routes* on the Atlas tunnel, so they only resolve for WARP-enrolled devices.
-- **LAN discovery:** `ssh fvideira@atlas.local` (avahi) works on the same LAN.
+- **Web UIs:** `https://<name>.atlas.example.com` over WARP (`example.com` is a placeholder for your
+  domain). These are *private hostname routes* on the Atlas tunnel, so they only resolve for WARP-enrolled devices.
+- **LAN discovery:** `ssh <user>@<hostname>.local` (avahi) works on the same LAN (`atlas` is the default
+  hostname used in this repo).
 
 ## Docker network
 
@@ -51,14 +52,31 @@ hostname needs an alias on the container that answers it (see Caddy and ssh-fwd)
 
 | Hostname | Goes to |
 |---|---|
-| `arcane.atlas.fernandovideira.com` | Caddy -> `arcane:3552` |
-| `pihole.atlas.fernandovideira.com` | Caddy -> `pihole:80` (`/admin`) |
-| `home.atlas.fernandovideira.com` | Caddy -> `host.docker.internal:8123` |
-| `ssh.atlas.fernandovideira.com` | `ssh-fwd` -> host sshd :22 |
+| `arcane.atlas.example.com` | Caddy -> `arcane:3552` |
+| `pihole.atlas.example.com` | Caddy -> `pihole:80` (`/admin`) |
+| `home.atlas.example.com` | Caddy -> `host.docker.internal:8123` |
+| `ssh.atlas.example.com` | `ssh-fwd` -> host sshd :22 |
 
 Adding a service: join it to the `cloudflare` network (no `ports:`), add its hostname as a
 Caddy alias and a Caddyfile block, add a private hostname route on the tunnel, add it to the
 Access policy.
+
+## Configuration (.env)
+
+Nothing personal is hardcoded in the compose files or scripts. Each stack reads its values
+from its own `.env` (copy `.env.example`, `chmod 600`, never commit it). The scripts derive the
+repo path and user from where they are checked out.
+
+| Stack | Variables |
+|---|---|
+| `arcane/` | `ENCRYPTION_KEY`, `JWT_SECRET`, `APP_URL` (public URL of the UI, e.g. `https://arcane.atlas.example.com`) |
+| `caddy/` | `CF_API_TOKEN`, `DOMAIN` (zone of the private hostnames, e.g. `atlas.example.com`) |
+| `cloudflared/` | `TUNNEL_TOKEN`, `DOMAIN` (same value as in `caddy/.env`) |
+| `pihole/` | `PIHOLE_PASSWORD`, `DNS_BIND` (managed by `mode.sh`, leave empty), `TZ` (e.g. `Europe/London`) |
+| `home-assistant/` | `TZ` |
+
+Services are reachable at `arcane.<DOMAIN>`, `pihole.<DOMAIN>`, `home.<DOMAIN>` and
+`ssh.<DOMAIN>`. Off-site backup settings live elsewhere, see the backups section below.
 
 ## Scripts and scheduled jobs
 
@@ -95,7 +113,7 @@ it pings healthchecks.io (start, success, fail).
 The script skips the upload and alerts when the repository would exceed 9.5 GiB, and alerts
 above 8 GiB; both thresholds are variables (`CAP_GIB`, `WARN_GIB`) at the top of `offsite.sh`.
 
-The restic password is stored in Proton Pass. Without it the backups are unreadable, so
+The restic password is stored in your password manager. Without it the backups are unreadable, so
 never lose it.
 
 One-time setup:
@@ -112,7 +130,7 @@ crontab -e                                      # as root, add the line below
 ```
 
 ```
-15 3 * * * /home/fvideira/deploy/backup/offsite.sh
+15 3 * * * /home/<user>/deploy/backup/offsite.sh
 ```
 
 List snapshots and restore (as root, with the env loaded as above):
@@ -124,12 +142,12 @@ restic restore latest --target /tmp/restore
 
 Log: `/mnt/ssd/backups/offsite.log`.
 
-### Cron (user `fvideira`)
+### Cron (user)
 
 ```
 PATH=/usr/local/bin:/usr/bin:/bin
-0 4 1 * * /home/fvideira/deploy/caddy/update.sh
-30 4 1 * * /home/fvideira/deploy/pihole/unbound-update.sh
+0 4 1 * * /home/<user>/deploy/caddy/update.sh
+30 4 1 * * /home/<user>/deploy/pihole/unbound-update.sh
 ```
 
 View with `crontab -l`. Cron does not catch up if the Pi is off at 04:00.
@@ -138,15 +156,16 @@ View with `crontab -l`. Cron does not catch up if the Pi is off at 04:00.
 
 ```
 PATH=/usr/local/bin:/usr/bin:/bin
-0 3 * * * /home/fvideira/deploy/backup/backup.sh
-15 3 * * * /home/fvideira/deploy/backup/offsite.sh
+0 3 * * * /home/<user>/deploy/backup/backup.sh
+15 3 * * * /home/<user>/deploy/backup/offsite.sh
 ```
 
 View with `sudo crontab -l`.
 
 ### systemd
 
-Unit files are kept in `~/deploy/pihole/systemd/` and installed into `/etc/systemd/system/`.
+Unit files are kept in `~/deploy/pihole/systemd/` (the two services are templates with `@USER@`
+and `@DEPLOY_DIR@`) and installed into `/etc/systemd/system/` by `install.sh`.
 
 - `pihole-mode.service` (oneshot at boot): runs `mode.sh auto`.
 - Network change trigger, **use one of these, not both**:
@@ -157,16 +176,11 @@ Unit files are kept in `~/deploy/pihole/systemd/` and installed into `/etc/syste
 
 `mode.sh` takes a lock, so overlapping runs (boot service plus a trigger) are harmless.
 
-Install:
+Install (run as the deploy user; the script renders the two service files with your user name
+and the repo's path, copies the timer, enables everything and restarts `pihole-mode.service`):
 
 ```bash
-mkdir -p ~/deploy/pihole/systemd
-# put pihole-mode.service, pihole-sync.service and pihole-sync.timer there, then:
-sudo cp ~/deploy/pihole/systemd/pihole-mode.service /etc/systemd/system/
-sudo cp ~/deploy/pihole/systemd/pihole-sync.service ~/deploy/pihole/systemd/pihole-sync.timer /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable pihole-mode.service
-sudo systemctl enable --now pihole-sync.timer
+sudo ~/deploy/pihole/systemd/install.sh
 ```
 
 Check status and logs:
@@ -205,7 +219,7 @@ case "$2" in
   up|dhcp4-change) ;;
   *) exit 0 ;;
 esac
-runuser -u fvideira -- env HOME=/home/fvideira /home/fvideira/deploy/pihole/mode.sh sync >/dev/null 2>&1 &
+runuser -u <user> -- env HOME=/home/<user> /home/<user>/deploy/pihole/mode.sh sync >/dev/null 2>&1 &
 exit 0
 EOF
 sudo chown root:root /etc/NetworkManager/dispatcher.d/90-pihole-bind
@@ -223,13 +237,11 @@ on the LAN. Intended rules (verify with `sudo ufw status numbered`):
   `ssh-fwd` reach sshd)
 - 8123/tcp from `172.18.0.0/16` (Caddy -> Home Assistant) and from the LAN ranges
 - 21063:21070/tcp from the LAN ranges (HomeKit bridges)
-- The old `10.71.71.0/24` and `192.168.1.0/24` rules should be deleted
 
 ## Cloudflare
 
-- Tunnel: **Atlas Server** (token in `cloudflared/.env` as `TUNNEL_TOKEN`).
-- Routes: the four private hostname routes above. Remove the `10.71.71.0/24` CIDR route
-  and its Split Tunnel entry.
+- Tunnel: `<tunnel name>` (token in `cloudflared/.env` as `TUNNEL_TOKEN`).
+- Routes: the four private hostname routes above.
 - Split Tunnels (Include mode) must contain `172.64.128.0/20` (added automatically).
 - Access: one application restricting these hostnames to your email.
 - Caddy's certificates use a scoped API token (`Zone:Read`, `DNS:Edit`) in `caddy/.env`.
@@ -237,9 +249,9 @@ on the LAN. Intended rules (verify with `sudo ufw status numbered`):
 ## Moving to a new network (checklist)
 
 1. SSH is allowed from all private ranges (not just the old subnet).
-2. `atlas.local` resolves; the new router's device list is the fallback.
+2. `<hostname>.local` resolves; the new router's device list is the fallback.
 3. On the new router: DHCP reservation for the Pi, then set the router's DNS to the Pi
-   after testing one device (`dig @<ip> example.com +short`).
+   after testing one device (`dig @<pi-ip> example.com +short`).
 4. Check `mode.log` / `docker ps`: Pi-hole must be bound to the new address.
 5. Check the Docker subnets don't collide with the new LAN (`ip route`).
 6. `docker logs cloudflared`: four `Registered tunnel connection` lines.
@@ -254,7 +266,7 @@ tail -n 30 ~/deploy/caddy/update.log
 tail -n 30 ~/deploy/pihole/unbound-update.log
 tail -n 30 ~/deploy/pihole/mode.log
 dig @127.0.0.1 example.com +short                  # through Pi-hole
-dig @10.71.71.112 sigfail.verteiltesysteme.net      # expect SERVFAIL
+dig @<pi-ip> sigfail.verteiltesysteme.net      # expect SERVFAIL
 ```
 
 ## Known issues and open items

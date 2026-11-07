@@ -9,7 +9,7 @@ services:
     networks:
       cloudflare:
         aliases:
-          - ssh.atlas.fernandovideira.com
+          - ssh.${DOMAIN:?set DOMAIN in cloudflared/.env}
 
   cloudflared:
     image: cloudflare/cloudflared:latest

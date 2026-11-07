@@ -6,6 +6,7 @@ services:
     restart: unless-stopped
     environment:
       - CF_API_TOKEN=${CF_API_TOKEN}
+      - DOMAIN=${DOMAIN:?set DOMAIN in caddy/.env}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     labels:
@@ -17,9 +18,9 @@ services:
     networks:
       cloudflare:
         aliases:
-          - arcane.atlas.fernandovideira.com
-          - pihole.atlas.fernandovideira.com
-          - home.atlas.fernandovideira.com
+          - arcane.${DOMAIN:?set DOMAIN in caddy/.env}
+          - pihole.${DOMAIN:?set DOMAIN in caddy/.env}
+          - home.${DOMAIN:?set DOMAIN in caddy/.env}
 networks:
   cloudflare:
     external: true

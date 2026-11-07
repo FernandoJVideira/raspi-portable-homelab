@@ -6,7 +6,7 @@ set -Eeuo pipefail
 ENV_FILE="${RESTIC_ENV_FILE:-/root/.config/restic/env}"
 DEST="/mnt/ssd/backups"
 LOG="$DEST/offsite.log"
-USER_HOME="/home/fvideira"
+DEPLOY_DIR="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
 APPDATA="/mnt/ssd/AppData"
 WARN_GIB=8                                # alert when the repository is above this size
 CAP_GIB=9.5                               # skip the upload if the repository would exceed this (R2 free tier: 10 GB)
@@ -51,7 +51,7 @@ ping_hc /start
 
 # Only include paths that exist
 paths=()
-for p in "$APPDATA" "$USER_HOME/deploy" \
+for p in "$APPDATA" "$DEPLOY_DIR" \
          /etc/ssh/sshd_config.d /etc/ufw /etc/docker/daemon.json /etc/fstab \
          /etc/systemd/system/pihole-mode.service /etc/systemd/system/pihole-sync.service \
          /etc/systemd/system/pihole-sync.timer /etc/NetworkManager/dispatcher.d/90-pihole-bind \
