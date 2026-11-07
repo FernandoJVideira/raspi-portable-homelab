@@ -1,0 +1,26 @@
+services:
+  ssh-fwd:
+    image: alpine/socat
+    container_name: ssh-fwd
+    restart: unless-stopped
+    command: tcp-listen:22,fork,reuseaddr tcp:host.docker.internal:22
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      cloudflare:
+        aliases:
+          - ssh.atlas.fernandovideira.com
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+    networks:
+      - cloudflare
+
+networks:
+  cloudflare:
+    external: true

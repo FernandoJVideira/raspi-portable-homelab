@@ -1,0 +1,21 @@
+arcane.atlas.fernandovideira.com {
+	tls {
+		dns cloudflare {env.CF_API_TOKEN}
+	}
+	reverse_proxy arcane:3552
+}
+
+pihole.atlas.fernandovideira.com {
+   	tls {
+   		dns cloudflare {env.CF_API_TOKEN}
+   	}
+   	redir / /admin/ 302
+   	reverse_proxy pihole:80
+}
+
+home.atlas.fernandovideira.com {
+	tls {
+		dns cloudflare {env.CF_API_TOKEN}
+	}
+	reverse_proxy host.docker.internal:8123
+}

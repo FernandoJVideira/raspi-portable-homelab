@@ -1,0 +1,41 @@
+services:
+  unbound:
+    build: ./unbound
+    image: unbound-local:latest
+    container_name: unbound
+    labels:
+      - com.getarcaneapp.arcane.updater=false
+    restart: unless-stopped
+    networks:
+      dns:
+        ipv4_address: 172.31.53.2
+
+  pihole:
+    container_name: pihole
+    image: pihole/pihole:latest
+    depends_on:
+      - unbound
+    ports:
+      - "${DNS_BIND:-127.0.0.1}:53:53/tcp"
+      - "${DNS_BIND:-127.0.0.1}:53:53/udp"
+    environment:
+      TZ: 'Europe/Lisbon'
+      FTLCONF_webserver_api_password: "${PIHOLE_PASSWORD}"
+      FTLCONF_dns_listeningMode: 'ALL'
+      FTLCONF_dns_upstreams: '172.31.53.2'
+    volumes:
+      - '/mnt/ssd/AppData/pihole:/etc/pihole'
+    cap_add:
+      - SYS_NICE
+    networks:
+      - cloudflare
+      - dns
+    restart: unless-stopped
+
+networks:
+  cloudflare:
+    external: true
+  dns:
+    ipam:
+      config:
+        - subnet: 172.31.53.0/24

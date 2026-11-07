@@ -1,0 +1,15 @@
+[Unit]
+Description=Set Pi-hole bind address for the current network
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=fvideira
+ExecStart=/home/fvideira/deploy/pihole/mode.sh auto
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

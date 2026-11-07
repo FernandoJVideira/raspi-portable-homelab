@@ -1,0 +1,12 @@
+# secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+# runtime data and state
+pihole/etc-pihole/
+*.db
+*.log
+.*.lock
+.pin-localhost

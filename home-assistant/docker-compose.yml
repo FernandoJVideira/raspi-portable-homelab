@@ -1,0 +1,14 @@
+services:
+  homeassistant:
+    container_name: homeassistant
+    image: ghcr.io/home-assistant/home-assistant:stable
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    network_mode: host
+    environment:
+      - TZ=Europe/Lisbon
+    volumes:
+      - /mnt/ssd/AppData/home-assistant:/config
+      - /run/dbus:/run/dbus:ro

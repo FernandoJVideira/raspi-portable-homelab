@@ -1,0 +1,25 @@
+services:
+  caddy:
+    build: .
+    image: caddy-cloudflare:local
+    container_name: caddy
+    restart: unless-stopped
+    environment:
+      - CF_API_TOKEN=${CF_API_TOKEN}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    labels:
+      - com.getarcaneapp.arcane.updater=false
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - /mnt/ssd/AppData/caddy/caddy_data:/data
+      - /mnt/ssd/AppData/caddy/caddy_config:/config
+    networks:
+      cloudflare:
+        aliases:
+          - arcane.atlas.fernandovideira.com
+          - pihole.atlas.fernandovideira.com
+          - home.atlas.fernandovideira.com
+networks:
+  cloudflare:
+    external: true
