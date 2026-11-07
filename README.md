@@ -7,6 +7,8 @@ Nothing is published to the internet except what you explicitly add as a public 
 > Secrets are never stored in this file. Tokens and passwords live in each stack's
 > `.env` (chmod 600, not in git) and in Proton Pass.
 
+To build a new Atlas from scratch, follow [GUIDE.md](GUIDE.md).
+
 ## Layout
 
 ```
