@@ -83,6 +83,45 @@ recreates the container (`docker compose up -d`).
 
 Log: `pihole/mode.log`.
 
+### `backup/backup.sh` and `backup/offsite.sh` (nightly backups)
+
+`backup.sh` writes local tarballs to `/mnt/ssd/backups` at 03:00 (root crontab). `offsite.sh`
+pushes an encrypted restic snapshot to the Cloudflare R2 bucket `atlas-backup` at 03:15 (root
+crontab), so a dead SSD no longer takes the backups with it. It keeps 7 daily, 4 weekly and
+6 monthly snapshots; on Sundays it also prunes and checks 5% of the data. If `HC_URL` is set
+it pings healthchecks.io (start, success, fail).
+The script skips the upload and alerts when the repository would exceed 9.5 GiB, and alerts
+above 8 GiB; both thresholds are variables (`CAP_GIB`, `WARN_GIB`) at the top of `offsite.sh`.
+
+The restic password is stored in Proton Pass. Without it the backups are unreadable, so
+never lose it.
+
+One-time setup:
+
+```bash
+sudo apt install restic
+sudo mkdir -p /root/.config/restic
+sudo install -m 600 ~/deploy/backup/offsite.env.example /root/.config/restic/env
+sudo nano /root/.config/restic/env             # fill in the values
+sudo sh -c 'umask 077; cat > /root/.config/restic/password'   # paste the password, Ctrl-D
+sudo -i
+set -a; . /root/.config/restic/env; set +a; restic init
+crontab -e                                      # as root, add the line below
+```
+
+```
+15 3 * * * /home/fvideira/deploy/backup/offsite.sh
+```
+
+List snapshots and restore (as root, with the env loaded as above):
+
+```bash
+restic snapshots
+restic restore latest --target /tmp/restore
+```
+
+Log: `/mnt/ssd/backups/offsite.log`.
+
 ### Cron (user `fvideira`)
 
 ```
@@ -92,6 +131,16 @@ PATH=/usr/local/bin:/usr/bin:/bin
 ```
 
 View with `crontab -l`. Cron does not catch up if the Pi is off at 04:00.
+
+### Cron (root)
+
+```
+PATH=/usr/local/bin:/usr/bin:/bin
+0 3 * * * /home/fvideira/deploy/backup/backup.sh
+15 3 * * * /home/fvideira/deploy/backup/offsite.sh
+```
+
+View with `sudo crontab -l`.
 
 ### systemd
 
