@@ -1,6 +1,6 @@
 # Atlas
 
-Raspberry Pi 4B (Debian trixie, arm64) running a small self-hosted stack in Docker.
+A small self-hosted stack in Docker for any 64-bit Linux host. The reference build is a Raspberry Pi 4B (Debian trixie, arm64).
 Remote access goes through a Cloudflare Tunnel and the WARP client (Zero Trust).
 Nothing is published to the internet except what you explicitly add as a public hostname.
 
@@ -156,7 +156,7 @@ PATH=/usr/local/bin:/usr/bin:/bin
 30 4 1 * * /home/<user>/deploy/pihole/unbound-update.sh
 ```
 
-View with `crontab -l`. Cron does not catch up if the Pi is off at 04:00.
+View with `crontab -l`. Cron does not catch up if the host is off at 04:00.
 
 ### Cron (root)
 
@@ -247,7 +247,7 @@ on the LAN. Intended rules (verify with `sudo ufw status numbered`):
 ## Cloudflare
 
 - Tunnel: `<tunnel name>` (token in `cloudflared/.env` as `TUNNEL_TOKEN`).
-- Routes: the four private hostname routes above.
+- Routes: the private hostname routes above, one per hostname.
 - Split Tunnels (Include mode) must contain `172.64.128.0/20` (added automatically).
 - Access: one application restricting these hostnames to your email.
 - Caddy's certificates use a scoped API token (`Zone:Read`, `DNS:Edit`) in `caddy/.env`.
@@ -256,7 +256,7 @@ on the LAN. Intended rules (verify with `sudo ufw status numbered`):
 
 1. SSH is allowed from all private ranges (not just the old subnet).
 2. `<hostname>.local` resolves; the new router's device list is the fallback.
-3. On the new router: DHCP reservation for the Pi, then set the router's DNS to the Pi
+3. On the new router: DHCP reservation for the host, then set the router's DNS to the host
    after testing one device (`dig @<pi-ip> example.com +short`).
 4. Check `mode.log` / `docker ps`: Pi-hole must be bound to the new address.
 5. Check the Docker subnets don't collide with the new LAN (`ip route`).

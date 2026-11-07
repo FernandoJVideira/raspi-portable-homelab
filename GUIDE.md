@@ -1,42 +1,34 @@
 # Building Atlas from scratch
 
-This guide is the ordered procedure to deploy the whole setup on a fresh Raspberry Pi 4B that
-boots from a USB SSD. The [README](README.md) is the reference; this guide links to it instead
-of repeating long explanations. Replace every `<placeholder>` with your own value, and take
-secrets from your password manager. Never paste secrets into git.
+This guide is the ordered procedure to deploy the whole setup on a fresh 64-bit Linux host
+(Debian-based). The reference build is a Raspberry Pi 4B booting from a USB SSD, see the
+[appendix](#appendix-raspberry-pi-4b-reference-build). The [README](README.md) is the reference;
+this guide links to it instead of repeating long explanations. Replace every `<placeholder>`
+with your own value, and take secrets from your password manager. Never paste secrets into git.
 
 If you are rebuilding from a backup instead of starting fresh, follow phases 1 to 4, then do
 phase 5 (restore), then continue from phase 6.
 
-## Phase 1. Hardware and operating system
+## Phase 1. Host and operating system
 
-1. Assemble the Pi 4B with the Geekworm X735 HAT (fan) and connect the Crucial SSD in its USB 3
-   enclosure to a blue USB 3 port. Connect Ethernet. Do not insert an SD card.
-2. The Pi 4 bootloader default `BOOT_ORDER` is `0xf41`: it tries the SD card, then USB. With no
-   SD card inserted it boots from the SSD, so no change is needed. Recent Pi 4s boot from USB out
-   of the box. If your Pi has ever booted from an SD card, update the bootloader first, from that
-   SD card, and reboot:
-
-   ```bash
-   sudo rpi-eeprom-update -a
-   sudo reboot
-   ```
-
-3. On your computer, open Raspberry Pi Imager and flash **Raspberry Pi OS Lite (64-bit)**
-   (Debian 13 trixie) directly onto the SSD. In the OS customisation settings use:
+1. Use any 64-bit (amd64 or arm64) machine that can run Docker. It needs persistent storage for
+   `/mnt/ssd`, because later phases keep all data under that path. The reference build is a
+   Raspberry Pi 4B. For its assembly, USB boot and flashing, see the
+   [appendix](#appendix-raspberry-pi-4b-reference-build).
+2. Install a Debian-based OS (the reference build uses Debian 13 trixie). During setup use:
    - A hostname, written `<hostname>` in this guide (this repo uses `atlas` as the example).
    - A username of your choice, written `<user>` in this guide.
    - SSH enabled, public-key authentication only (paste your public key).
    - Timezone `<your timezone>` (for example `Europe/London`).
-   - Wi-Fi is optional. Ethernet is the primary link. With no Ethernet link the Pi falls back
+   - Ethernet as the primary link. Wi-Fi is optional. With no Ethernet link the host falls back
      to Wi-Fi and gets a different IP.
-4. Plug the SSD into the Pi and power it on. Log in over SSH:
+3. Boot the machine and log in over SSH:
 
    ```bash
    ssh <user>@<hostname>.local
    ```
 
-5. Update the system:
+4. Update the system:
 
    ```bash
    sudo apt update && sudo apt full-upgrade -y
@@ -45,8 +37,8 @@ phase 5 (restore), then continue from phase 6.
 
 ## Phase 2. Network and router
 
-1. In your router, create a DHCP reservation for the Pi so its IP never changes.
-2. Do **not** point the router's DNS at the Pi yet. That happens in phase 12, after Pi-hole has
+1. In your router, create a DHCP reservation for the host so its IP never changes.
+2. Do **not** point the router's DNS at the host yet. That happens in phase 12, after Pi-hole has
    been tested from one device.
 
 ## Phase 3. Data folders and the repository
@@ -249,37 +241,18 @@ sudo ufw status numbered
 
 Docker-published ports bypass ufw, so publish nothing you do not want on the LAN.
 
-## Phase 11. X735 fan
+## Phase 11. Hardware extras (optional)
 
-1. Install Geekworm's service:
-
-   ```bash
-   git clone https://github.com/geekworm-com/x735-script ~/x735-script
-   cd ~/x735-script && sudo ./install-fan-service.sh
-   ```
-
-2. Add this line under `[all]` in `/boot/firmware/config.txt`, then reboot:
-
-   ```
-   dtoverlay=pwm-2chan,pin2=13,func2=4
-   ```
-
-3. Install `gpiod` (it provides `gpiomon`, and Lite may not have it), then check the service
-   and the fan tachometer:
-
-   ```bash
-   sudo apt install -y gpiod
-   systemctl status x735-fan
-   n=$(timeout 2 gpiomon -c gpiochip0 -e falling -b pull-up 16 | wc -l); echo "~$((n*60/4)) RPM"
-   ```
+Skip this phase unless your hardware needs extra setup, such as a fan or a HAT. The fan steps
+for the reference Pi 4B build (Geekworm X735) are in the [appendix](#x735-fan).
 
 ## Phase 12. Cloudflare, router DNS and cron
 
-1. Finish the Cloudflare setup (the four private hostname routes, the Access application and
-   WARP) as described in the README ([Cloudflare](README.md#cloudflare)). Check that the
+1. Finish the Cloudflare setup (a private hostname route for each hostname listed in the README, the Access application
+   and WARP) as described in the README ([Cloudflare](README.md#cloudflare)). Check that the
    tunnel is healthy.
-2. Test Pi-hole from one device, then point the router's DNS at the Pi. Pi-hole binds to the
-   Pi's IP automatically through `mode.sh`:
+2. Test Pi-hole from one device, then point the router's DNS at the host. Pi-hole binds to the
+   host's IP automatically through `mode.sh`:
 
    ```bash
    dig @<pi-ip> example.com +short
@@ -319,7 +292,7 @@ On a restored install restic is already set up (phase 5); skip to step 4. Otherw
 
 ## Phase 14. Verify
 
-Work through this checklist. Replace `<pi-ip>` with the Pi's address.
+Work through this checklist. Replace `<pi-ip>` with the host's address.
 
 1. The root filesystem is the SSD: `findmnt /` shows `/dev/sda2`.
 2. `docker ps` shows seven containers: `unbound`, `pihole`, `cloudflared`, `ssh-fwd`, `caddy`,
@@ -335,7 +308,7 @@ Work through this checklist. Replace `<pi-ip>` with the Pi's address.
    It must print `200`.
 6. `docker logs cloudflared` shows four `Registered tunnel connection` lines.
 7. `systemctl --failed` is empty. `NetworkManager-wait-online` may fail; that is harmless.
-8. The fan spins: repeat the RPM check from phase 11.
+8. The fan spins, if your host has one: see the RPM check in the appendix.
 9. First backups. Run both by hand as root and read the logs:
 
    ```bash
@@ -349,3 +322,51 @@ Work through this checklist. Replace `<pi-ip>` with the Pi's address.
 
 When everything passes, Atlas is ready. Day-to-day commands and known issues are in the README
 ([Useful commands](README.md#useful-commands)).
+
+## Appendix. Raspberry Pi 4B reference build
+
+The reference build is a Raspberry Pi 4B that boots from a USB SSD. These steps replace the
+hardware and install parts of phase 1.
+
+### Assembly and USB boot
+
+1. Assemble the Pi 4B with the Geekworm X735 HAT (fan) and connect the Crucial SSD in its USB 3
+   enclosure to a blue USB 3 port. Connect Ethernet. Do not insert an SD card.
+2. The Pi 4 bootloader default `BOOT_ORDER` is `0xf41`: it tries the SD card, then USB. With no
+   SD card inserted it boots from the SSD, so no change is needed. Recent Pi 4s boot from USB out
+   of the box. If your Pi has ever booted from an SD card, update the bootloader first, from that
+   SD card, and reboot:
+
+   ```bash
+   sudo rpi-eeprom-update -a
+   sudo reboot
+   ```
+
+3. On your computer, open Raspberry Pi Imager and flash **Raspberry Pi OS Lite (64-bit)**
+   (Debian 13 trixie) directly onto the SSD. In the OS customisation settings, use the values
+   from step 2 of phase 1.
+4. Plug the SSD into the Pi and power it on, then continue with step 3 of phase 1.
+
+### X735 fan
+
+1. Install Geekworm's service:
+
+   ```bash
+   git clone https://github.com/geekworm-com/x735-script ~/x735-script
+   cd ~/x735-script && sudo ./install-fan-service.sh
+   ```
+
+2. Add this line under `[all]` in `/boot/firmware/config.txt`, then reboot:
+
+   ```
+   dtoverlay=pwm-2chan,pin2=13,func2=4
+   ```
+
+3. Install `gpiod` (it provides `gpiomon`, and Lite may not have it), then check the service
+   and the fan tachometer:
+
+   ```bash
+   sudo apt install -y gpiod
+   systemctl status x735-fan
+   n=$(timeout 2 gpiomon -c gpiochip0 -e falling -b pull-up 16 | wc -l); echo "~$((n*60/4)) RPM"
+   ```
