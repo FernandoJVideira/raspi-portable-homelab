@@ -21,6 +21,7 @@ services:
           - arcane.${DOMAIN:?set DOMAIN in caddy/.env}
           - pihole.${DOMAIN:?set DOMAIN in caddy/.env}
           - home.${DOMAIN:?set DOMAIN in caddy/.env}
+          - jellyfin.${DOMAIN:?set DOMAIN in caddy/.env}
 networks:
   cloudflare:
     external: true

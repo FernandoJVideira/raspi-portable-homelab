@@ -47,6 +47,7 @@ hostname needs an alias on the container that answers it (see Caddy and ssh-fwd)
 | `arcane/` | `arcane` | Docker UI. Root-equivalent access, keep it behind Access and its own login. No published ports. |
 | `pihole/` | `pihole`, `unbound` | Pi-hole forwards to Unbound (`172.31.53.2`). Unbound is locally built (`unbound-local:latest`). |
 | `home-assistant/` | `homeassistant` | `network_mode: host`, config in `/mnt/ssd/home-assistant`. |
+| `jellyfin/` | `jellyfin` | Media server. Config in `/mnt/ssd/jellyfin`, media in `/mnt/ssd/media`, neither backed up. Publishes 8096 on purpose: TV boxes and phones without WARP play directly over the LAN. |
 
 ### Hostnames (private hostname routes on the Atlas tunnel)
 
@@ -55,6 +56,7 @@ hostname needs an alias on the container that answers it (see Caddy and ssh-fwd)
 | `arcane.atlas.example.com` | Caddy -> `arcane:3552` |
 | `pihole.atlas.example.com` | Caddy -> `pihole:80` (`/admin`) |
 | `home.atlas.example.com` | Caddy -> `host.docker.internal:8123` |
+| `jellyfin.atlas.example.com` | Caddy -> `jellyfin:8096` |
 | `ssh.atlas.example.com` | `ssh-fwd` -> host sshd :22 |
 
 Adding a service: join it to the `cloudflare` network (no `ports:`), add its hostname as a
@@ -74,9 +76,10 @@ repo path and user from where they are checked out.
 | `cloudflared/` | `TUNNEL_TOKEN`, `DOMAIN` (same value as in `caddy/.env`) |
 | `pihole/` | `PIHOLE_PASSWORD`, `DNS_BIND` (managed by `mode.sh`, leave empty), `TZ` (e.g. `Europe/London`) |
 | `home-assistant/` | `TZ` |
+| `jellyfin/` | `TZ`, `PUID`, `PGID` (owner of `/mnt/ssd/jellyfin`, from `id -u` and `id -g`) |
 
-Services are reachable at `arcane.<DOMAIN>`, `pihole.<DOMAIN>`, `home.<DOMAIN>` and
-`ssh.<DOMAIN>`. Off-site backup settings live elsewhere, see the backups section below.
+Services are reachable at `arcane.<DOMAIN>`, `pihole.<DOMAIN>`, `home.<DOMAIN>`, `jellyfin.<DOMAIN>` and
+`ssh.<DOMAIN>`. Jellyfin is also at `http://<pi-ip>:8096` on the LAN. Off-site backup settings live elsewhere, see the backups section below.
 
 ## Scripts and scheduled jobs
 
@@ -115,6 +118,9 @@ above 8 GiB; both thresholds are variables (`CAP_GIB`, `WARN_GIB`) at the top of
 
 The restic password is stored in your password manager. Without it the backups are unreadable, so
 never lose it.
+
+Jellyfin config and media (`/mnt/ssd/jellyfin`, `/mnt/ssd/media`) are not backed up, locally or
+off-site.
 
 One-time setup:
 

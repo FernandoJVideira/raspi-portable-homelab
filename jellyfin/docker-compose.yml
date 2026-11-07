@@ -1,0 +1,22 @@
+services:
+  jellyfin:
+    container_name: jellyfin
+    image: ghcr.io/hotio/jellyfin:release
+    restart: unless-stopped
+    networks:
+      cloudflare:
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - UMASK=002
+      - TZ=${TZ:-Etc/UTC}
+    ports:
+      - 8096:8096
+    volumes:
+      # Deliberately outside /mnt/ssd/AppData and this repo: neither backup script includes them
+      - /mnt/ssd/jellyfin:/config
+      - /mnt/ssd/media:/data/media:ro
+
+networks:
+  cloudflare:
+    external: true

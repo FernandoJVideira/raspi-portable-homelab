@@ -19,3 +19,10 @@ home.{$DOMAIN} {
 	}
 	reverse_proxy host.docker.internal:8123
 }
+
+jellyfin.{$DOMAIN} {
+	tls {
+		dns cloudflare {env.CF_API_TOKEN}
+	}
+	reverse_proxy jellyfin:8096
+}

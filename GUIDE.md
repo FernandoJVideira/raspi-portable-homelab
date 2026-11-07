@@ -59,10 +59,17 @@ root filesystem (no separate partition and no fstab entry).
    ```bash
    sudo mkdir -p /mnt/ssd/AppData/{pihole,home-assistant,arcane,caddy/caddy_data,caddy/caddy_config}
    sudo mkdir -p /mnt/ssd/backups
-   sudo chown -R $USER:$USER /mnt/ssd/AppData
+   sudo mkdir -p /mnt/ssd/{jellyfin,media}
+   sudo chown -R $USER:$USER /mnt/ssd/AppData /mnt/ssd/jellyfin /mnt/ssd/media
    ```
 
    `/mnt/ssd/backups` stays owned by root; `backup.sh` sets mode 700 on it.
+
+   `/mnt/ssd/jellyfin` (Jellyfin config, database and cache) and `/mnt/ssd/media` (the library) are
+   deliberately outside `/mnt/ssd/AppData` and the repo, so neither `backup.sh` nor `offsite.sh`
+   includes them; the R2 free tier is 10 GB. To rebuild Jellyfin elsewhere: create the folders,
+   copy the media back into `/mnt/ssd/media`, start the stack and run the Jellyfin setup wizard
+   again (libraries point at `/data/media`).
 
 2. Fork the repository on GitHub (or clone it directly) and use your fork's URL. Replace `<you>`
    with your GitHub username:
@@ -176,7 +183,7 @@ your password manager:
 
 ```bash
 cd ~/deploy
-for s in arcane caddy cloudflared pihole home-assistant; do
+for s in arcane caddy cloudflared pihole home-assistant jellyfin; do
   cp "$s/.env.example" "$s/.env"
   chmod 600 "$s/.env"
 done
@@ -185,10 +192,11 @@ nano caddy/.env           # CF_API_TOKEN, DOMAIN (atlas.example.com)
 nano cloudflared/.env     # TUNNEL_TOKEN, DOMAIN (same value as in caddy/.env)
 nano pihole/.env          # PIHOLE_PASSWORD, TZ; leave DNS_BIND empty, mode.sh manages it
 nano home-assistant/.env  # TZ (for example Europe/London)
+nano jellyfin/.env        # TZ, PUID, PGID
 ```
 
 `DOMAIN` is the zone your private hostnames live under: the services answer at
-`arcane.<DOMAIN>`, `pihole.<DOMAIN>`, `home.<DOMAIN>` and `ssh.<DOMAIN>`.
+`arcane.<DOMAIN>`, `pihole.<DOMAIN>`, `home.<DOMAIN>`, `jellyfin.<DOMAIN>` and `ssh.<DOMAIN>`.
 
 The Cloudflare side (tunnel, token scopes) is described in the README
 ([Cloudflare](README.md#cloudflare)). Create the tunnel and copy its token before this step.
