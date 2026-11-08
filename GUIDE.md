@@ -97,7 +97,17 @@ root filesystem (no separate partition and no fstab entry).
    sudo usermod -aG docker $USER
    ```
 
-3. Create the external network that the stacks share. The pihole stack creates its own `dns`
+3. Install the Docker daemon config and restart Docker. Containers copy the host's resolvers
+   when they start, and if the host boots before its network is up they get none and cannot
+   resolve internet names until restarted. The config gives them fixed upstream servers. If
+   `/etc/docker/daemon.json` already exists, merge the `dns` key into it instead of overwriting:
+
+   ```bash
+   sudo install -m 644 ~/deploy/docker/daemon.json /etc/docker/daemon.json
+   sudo systemctl restart docker
+   ```
+
+4. Create the external network that the stacks share. The pihole stack creates its own `dns`
    network (172.31.53.0/24) later:
 
    ```bash

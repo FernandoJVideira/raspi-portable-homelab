@@ -234,6 +234,23 @@ sudo chmod 755 /etc/NetworkManager/dispatcher.d/90-pihole-bind
 
 If you use the hook, disable the timer (command above), and the reverse.
 
+### Docker DNS
+
+Containers copy the host's resolvers when they start. If the host boots before its network is
+up, Docker starts them with no external nameservers: they resolve container names but nothing on
+the internet until restarted. `docker/daemon.json` gives all containers fixed upstream servers
+(`1.1.1.1` and `1.0.0.1`). Install it once and restart Docker (merge the `dns` key if
+`/etc/docker/daemon.json` already exists):
+
+```bash
+sudo install -m 644 ~/deploy/docker/daemon.json /etc/docker/daemon.json
+sudo systemctl restart docker
+```
+
+Check a container with `docker exec <container> cat /etc/resolv.conf`; the `ExtServers` line
+lists `1.1.1.1` and `1.0.0.1`. A container that started without external DNS is fixed with
+`docker restart <container>`.
+
 ### Home Assistant network hook
 
 Home Assistant runs with `network_mode: host` and its zeroconf binds network interfaces only at
