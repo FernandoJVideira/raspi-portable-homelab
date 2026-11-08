@@ -87,7 +87,8 @@ fi
 sys=()
 for p in /etc/ssh/sshd_config.d /etc/ufw /etc/docker/daemon.json /etc/fstab \
          /etc/systemd/system/pihole-mode.service /etc/systemd/system/pihole-sync.service \
-         /etc/systemd/system/pihole-sync.timer /etc/NetworkManager/dispatcher.d/90-pihole-bind; do
+         /etc/systemd/system/pihole-sync.timer /etc/NetworkManager/dispatcher.d/90-pihole-bind \
+         /etc/NetworkManager/dispatcher.d/90-homeassistant-restart; do
   if [ -e "$p" ]; then sys+=("${p#/}"); fi
 done
 safe_tar -czf "$OUT/system.tgz" -C / "${sys[@]}"

@@ -234,6 +234,34 @@ sudo chmod 755 /etc/NetworkManager/dispatcher.d/90-pihole-bind
 
 If you use the hook, disable the timer (command above), and the reverse.
 
+### Home Assistant network hook
+
+Home Assistant runs with `network_mode: host` and its zeroconf binds network interfaces only at
+startup. If it starts before the LAN interface has an address, the HomeKit bridge is never
+announced on the LAN and Apple Home loses the accessories until Home Assistant restarts.
+`home-assistant/networkmanager/90-homeassistant-restart` restarts the container 15 seconds after
+a LAN interface comes up (once per burst, and only if the container is running). It needs
+NetworkManager to manage the interface; with other network stacks, restart the container after
+the LAN comes up.
+
+Install:
+
+```bash
+sudo install -o root -g root -m 755 ~/deploy/home-assistant/networkmanager/90-homeassistant-restart /etc/NetworkManager/dispatcher.d/
+```
+
+Check:
+
+```bash
+journalctl -t homeassistant-restart
+```
+
+Remove:
+
+```bash
+sudo rm /etc/NetworkManager/dispatcher.d/90-homeassistant-restart
+```
+
 ## Firewall (ufw)
 
 Default deny incoming. Docker-published ports bypass ufw, so publish nothing you don't want

@@ -206,6 +206,13 @@ cd ~/deploy/arcane && docker compose up -d
 cd ~/deploy/home-assistant && docker compose up -d
 ```
 
+If NetworkManager manages your network, install the Home Assistant network hook so the HomeKit
+bridge is announced after a reboot (see [README](README.md#home-assistant-network-hook)):
+
+```bash
+sudo install -o root -g root -m 755 ~/deploy/home-assistant/networkmanager/90-homeassistant-restart /etc/NetworkManager/dispatcher.d/
+```
+
 ## Phase 9. systemd units for Pi-hole
 
 Run the installer as your normal user with sudo. It renders `pihole-mode.service` and

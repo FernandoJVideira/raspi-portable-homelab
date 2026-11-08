@@ -55,6 +55,7 @@ for p in "$APPDATA" "$DEPLOY_DIR" \
          /etc/ssh/sshd_config.d /etc/ufw /etc/docker/daemon.json /etc/fstab \
          /etc/systemd/system/pihole-mode.service /etc/systemd/system/pihole-sync.service \
          /etc/systemd/system/pihole-sync.timer /etc/NetworkManager/dispatcher.d/90-pihole-bind \
+         /etc/NetworkManager/dispatcher.d/90-homeassistant-restart \
          /var/spool/cron/crontabs \
          /usr/local/bin/x735-fan.sh /usr/lib/systemd/system/x735-fan.service; do
   if [ -e "$p" ]; then paths+=("$p"); fi

@@ -1,0 +1,17 @@
+#!/bin/sh
+# Home Assistant runs with network_mode: host and its zeroconf binds interfaces only at startup.
+# Restart it when a LAN interface comes up so the HomeKit bridge is announced on the LAN.
+case "$2" in
+  up) ;;
+  *) exit 0 ;;
+esac
+case "$1" in
+  lo|docker*|br-*|veth*) exit 0 ;;
+esac
+(
+  flock -n 9 || exit 0
+  sleep 15
+  logger -t homeassistant-restart "$1 up, restarting homeassistant"
+  [ "$(docker inspect -f '{{.State.Running}}' homeassistant 2>/dev/null)" = true ] && docker restart homeassistant
+) 9>/run/lock/homeassistant-restart.lock >/dev/null 2>&1 &
+exit 0
