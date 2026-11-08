@@ -364,6 +364,21 @@ hardware and install parts of phase 1.
    from step 2 of phase 1.
 4. Plug the SSD into the Pi and power it on, then continue with step 3 of phase 1.
 
+### Memory cgroup
+
+The Pi firmware adds `cgroup_disable=memory` to the kernel command line, so Docker has no memory
+controller: `docker stats` shows `0B` and Arcane shows CPU and memory as unavailable. Do this once
+after phase 1. `cmdline.txt` must stay a single line.
+
+```bash
+sudo cp /boot/firmware/cmdline.txt /boot/firmware/cmdline.txt.bak
+sudo sed -i '1 s/$/ cgroup_enable=memory/' /boot/firmware/cmdline.txt
+cat /boot/firmware/cmdline.txt
+sudo reboot
+```
+
+After the reboot, `cat /sys/fs/cgroup/cgroup.controllers` includes `memory`.
+
 ### X735 fan
 
 1. Install Geekworm's service:
